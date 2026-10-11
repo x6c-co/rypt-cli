@@ -1,0 +1,10 @@
+# Local credentials for tests against the live API. Never commit.
+.env
+.env.*
+
+# Build output
+/dist/
+/rypt
+/rypt.exe
+
+spec.md

@@ -4,8 +4,9 @@ Pushing a tag that starts with `v` runs
 [.github/workflows/release.yml](../.github/workflows/release.yml). It runs
 `make vet test race`, builds the six binaries with GoReleaser
 ([.goreleaser.yaml](../.goreleaser.yaml)), signs and notarizes the two macOS
-binaries, and publishes a GitHub release with the binaries, `SHA256SUMS`, and a
-changelog of the commits since the previous tag.
+binaries, publishes a GitHub release with the binaries, `SHA256SUMS`, and a
+changelog of the commits since the previous tag, and then updates the
+Homebrew cask in [x6c-co/homebrew-tap](https://github.com/x6c-co/homebrew-tap).
 
 ```sh
 git tag -a v1.0.0 -m v1.0.0
@@ -13,7 +14,7 @@ git push origin v1.0.0
 ```
 
 A tag with a pre-release suffix, such as `v1.1.0-rc.1`, is published as a
-pre-release. `rypt version` prints the tag.
+pre-release and leaves the Homebrew cask alone. `rypt version` prints the tag.
 
 The release binaries are named and checksummed the same way as `make dist`
 output: `rypt-linux-amd64`, `rypt-darwin-arm64`, `rypt-windows-amd64.exe`, and
@@ -28,6 +29,47 @@ To build locally with the release configuration, unsigned, install
 `goreleaser release --snapshot --clean`. The binaries are in
 `dist/rypt_<os>_<arch>*/`.
 
+## The Homebrew tap
+
+GoReleaser writes `Casks/rypt.rb` in
+[x6c-co/homebrew-tap](https://github.com/x6c-co/homebrew-tap), so that
+`brew install --cask x6c-co/tap/rypt` installs rypt on macOS and Linux. The
+cask links the binary as `rypt`. On macOS, Homebrew quarantines what a cask
+downloads, and Gatekeeper accepts rypt because it is notarized.
+
+The workflow's own token cannot push to another repository, so the release
+needs a sixth secret, `HOMEBREW_TAP_TOKEN`: a fine-grained personal access
+token.
+
+1. At [Settings > Developer settings > Fine-grained tokens](https://github.com/settings/personal-access-tokens/new),
+   create a token:
+   - Resource owner: **x6c-co**.
+   - Repository access: **Only select repositories**, `x6c-co/homebrew-tap`.
+   - Permissions: **Contents: Read and write**.
+   - Expiration: the organization allows at most 366 days. Set a date, and
+     note it.
+
+   If you aren't an owner of x6c-co, an owner must approve the token
+   (Organization settings > Personal access tokens > Pending requests) before
+   it can push.
+2. Save it as a repository secret:
+
+   ```sh
+   gh secret set HOMEBREW_TAP_TOKEN -R x6c-co/rypt-cli
+   ```
+
+The token used by x6c-co/age-plugin-rypt works too, if you have its value.
+
+GoReleaser updates the tap after it publishes the GitHub release, so the
+workflow first checks, with a dry-run `git push`, that the token can push to
+the tap. An expired or missing token stops the release before anything is
+published. Replace the secret and re-run the failed job.
+
+If the tap update fails anyway, after the release is published, re-running the
+job does not help, because the release's files already exist. Edit
+`Casks/rypt.rb` in the tap by hand instead: set `version`, and the four
+`sha256` values from the release's `SHA256SUMS`.
+
 ## macOS signing and notarization
 
 GoReleaser signs the darwin binaries with a Developer ID Application
@@ -36,8 +78,9 @@ Linux runner, with [quill](https://github.com/anchore/quill), so no macOS
 runner is needed. A bare binary cannot have its notarization ticket stapled to
 it. macOS looks the ticket up online the first time the binary runs.
 
-The release workflow needs five repository secrets. It stops before building
-if any is missing, rather than publishing unsigned macOS binaries.
+Signing and notarizing need five repository secrets. The release workflow
+stops before building if any is missing, rather than publishing unsigned macOS
+binaries.
 
 | Secret | Contents |
 | --- | --- |

@@ -48,5 +48,26 @@ notarize:
 release:
   prerelease: auto # v1.2.0-rc.1 and the like are marked as pre-releases
 
+# Writes Casks/rypt.rb in x6c-co/homebrew-tap, so that
+# "brew install --cask x6c-co/tap/rypt" works on macOS and Linux.
+# Pre-releases leave the tap alone.
+homebrew_casks:
+  - name: rypt
+    description: Encrypt and decrypt files with envelope encryption using rypt.dev keys
+    homepage: https://github.com/x6c-co/rypt-cli
+    # "#{version}" is for Ruby, not GoReleaser: brew audit wants the cask's
+    # version in its URLs.
+    url:
+      template: "https://github.com/x6c-co/rypt-cli/releases/download/v#{version}/{{ .ArtifactName }}"
+    repository:
+      owner: x6c-co
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    commit_author:
+      name: github-actions[bot]
+      email: 41898282+github-actions[bot]@users.noreply.github.com
+    commit_msg_template: "{{ .ProjectName }} {{ .Version }}"
+    skip_upload: auto
+
 changelog:
   sort: asc

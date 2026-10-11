@@ -11,11 +11,18 @@ key-encryption keys; `rypt` never sees them.
 
 ## Install
 
-Each [release](https://github.com/x6c-co/rypt-cli/releases) has a binary for
-Linux, macOS, and Windows on amd64 and arm64, named like `rypt-linux-amd64`,
-and a `SHA256SUMS` file. The macOS binaries are signed with a Developer ID
-certificate and notarized by Apple. Rename the binary to `rypt` (`rypt.exe`
-on Windows) and, on Linux and macOS, make it executable with `chmod +x rypt`.
+With [Homebrew](https://brew.sh), on macOS or Linux:
+
+```sh
+brew install --cask x6c-co/tap/rypt
+```
+
+Or download it: each [release](https://github.com/x6c-co/rypt-cli/releases)
+has a binary for Linux, macOS, and Windows on amd64 and arm64, named like
+`rypt-linux-amd64`, and a `SHA256SUMS` file. The macOS binaries are signed with
+a Developer ID certificate and notarized by Apple. Rename the binary to `rypt`
+(`rypt.exe` on Windows) and, on Linux and macOS, make it executable with
+`chmod +x rypt`.
 
 Or install with Go:
 

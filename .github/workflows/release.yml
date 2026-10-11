@@ -15,23 +15,40 @@ jobs:
     steps:
       # GoReleaser skips signing when MACOS_SIGN_P12 is empty, and a missing
       # secret arrives as an empty string. Fail rather than publish unsigned
-      # macOS binaries.
-      - name: Check signing secrets
+      # macOS binaries, or a release whose tap update is bound to fail.
+      - name: Check secrets
         env:
           MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
           MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
           MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
           MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
           MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           missing=
-          for name in MACOS_SIGN_P12 MACOS_SIGN_PASSWORD MACOS_NOTARY_ISSUER_ID MACOS_NOTARY_KEY_ID MACOS_NOTARY_KEY; do
+          for name in MACOS_SIGN_P12 MACOS_SIGN_PASSWORD MACOS_NOTARY_ISSUER_ID MACOS_NOTARY_KEY_ID MACOS_NOTARY_KEY HOMEBREW_TAP_TOKEN; do
             [ -n "${!name}" ] || missing="$missing $name"
           done
           if [ -n "$missing" ]; then
             echo "::error::Missing repository secrets:$missing. See docs/releasing.md."
             exit 1
           fi
+
+      # GoReleaser updates the tap after it publishes the GitHub release.
+      # Check now that the token can push, so that an expired token stops the
+      # release before anything is published.
+      - name: Check the tap token
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          git clone --quiet --depth 1 https://github.com/x6c-co/homebrew-tap.git "$RUNNER_TEMP/tap"
+          # The helper gives git the token only when git asks for it, so it is
+          # never on a command line or on disk. The single quotes are
+          # deliberate: git's helper shell expands ${TAP_TOKEN}.
+          # shellcheck disable=SC2016
+          git -C "$RUNNER_TEMP/tap" -c credential.helper= \
+            -c 'credential.helper=!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=${TAP_TOKEN}"; }; f' \
+            push --dry-run origin HEAD
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -54,3 +71,4 @@ jobs:
           MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
           MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
           MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

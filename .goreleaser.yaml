@@ -1,0 +1,52 @@
+# GoReleaser builds the release binaries. .github/workflows/release.yml runs
+# it on every v* tag. See docs/releasing.md.
+version: 2
+
+project_name: rypt
+
+builds:
+  - id: rypt
+    main: ./cmd/rypt
+    binary: rypt
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    # v-prefixed, like "make build" and "go install ...@v1.2.3".
+    ldflags:
+      - -s -w -X main.version=v{{ .Version }}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+
+# Plain binaries named like "make dist" names them: rypt-darwin-arm64,
+# rypt-windows-amd64.exe, and so on.
+archives:
+  - formats: [binary]
+    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
+
+checksum:
+  name_template: SHA256SUMS
+  algorithm: sha256
+
+# Sign the darwin binaries with the Developer ID Application certificate and
+# notarize them with Apple. Without MACOS_SIGN_P12 (local and CI snapshots)
+# this is skipped; the release workflow refuses to run without it.
+notarize:
+  macos:
+    - enabled: '{{ isEnvSet "MACOS_SIGN_P12" }}'
+      ids: [rypt]
+      sign:
+        certificate: "{{ .Env.MACOS_SIGN_P12 }}"
+        password: "{{ .Env.MACOS_SIGN_PASSWORD }}"
+      notarize:
+        issuer_id: "{{ .Env.MACOS_NOTARY_ISSUER_ID }}"
+        key_id: "{{ .Env.MACOS_NOTARY_KEY_ID }}"
+        key: "{{ .Env.MACOS_NOTARY_KEY }}"
+        wait: true
+        timeout: 20m
+
+release:
+  prerelease: auto # v1.2.0-rc.1 and the like are marked as pre-releases
+
+changelog:
+  sort: asc

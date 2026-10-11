@@ -11,6 +11,14 @@ key-encryption keys; `rypt` never sees them.
 
 ## Install
 
+Each [release](https://github.com/x6c-co/rypt-cli/releases) has a binary for
+Linux, macOS, and Windows on amd64 and arm64, named like `rypt-linux-amd64`,
+and a `SHA256SUMS` file. The macOS binaries are signed with a Developer ID
+certificate and notarized by Apple. Rename the binary to `rypt` (`rypt.exe`
+on Windows) and, on Linux and macOS, make it executable with `chmod +x rypt`.
+
+Or install with Go:
+
 ```sh
 go install github.com/x6c-co/rypt-cli/cmd/rypt@latest
 ```
@@ -25,8 +33,10 @@ make dist VERSION=v1.0.0
 ```
 
 `rypt version` prints the version given to `make`, or else the module version
-that `go install` records. To check a release, run `sha256sum -c SHA256SUMS`
-(`shasum -a 256 -c SHA256SUMS` on macOS) in the directory that holds it.
+that `go install` records. To check a release or `make dist` output, run
+`sha256sum -c --ignore-missing SHA256SUMS`
+(`shasum -a 256 -c --ignore-missing SHA256SUMS` on macOS) in the directory
+that holds it.
 
 ## Usage
 
@@ -177,6 +187,9 @@ when `RYPT_TOKEN` or `RYPT_KEY_ID` is unset. They never print the token.
 
 [docs/api-notes.md](docs/api-notes.md) records the observed behaviour of the
 `wrap` and `unwrap` endpoints.
+
+[docs/releasing.md](docs/releasing.md) explains how a release is built,
+signed, and published.
 
 ## License
 

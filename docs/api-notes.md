@@ -4,7 +4,7 @@ These notes record what the rypt API does for the two operations this program
 uses. Each item is marked with its source:
 
 - **live**: observed on 2026-10-11 against `https://api.rypt.dev` with a real
-  API key on an `hsm`-tier key, using `scripts/probe.go`.
+  API token on an `hsm`-tier key, using `scripts/probe.go`.
 - **openapi**: stated in the OpenAPI description (`openapi.yaml`, info version
   0.5.0) from https://bin.x6c.co/file/axzrrd.
 
@@ -152,13 +152,13 @@ Status codes for `wrap` and `unwrap`:
 | 400 | `invalid_request`, `invalid_base64`, `invalid_dek_length`, `invalid_ciphertext` | A bad request, or an `aad` or `wrapped` that does not authenticate | live (`invalid_request`, `invalid_ciphertext`), openapi |
 | 401 | `unauthorized` | A missing, malformed, revoked, or wrong token. All cases are indistinguishable. | live, openapi |
 | 402 | `billing_required` | A paid key whose tenant billing is not in good standing. `wrap` only. `unwrap` is never refused for billing. | openapi |
-| 403 | `ip_not_allowed`, `key_not_allowed`, `api_key_required` | A restricted API key. An API key restricted to particular keys gets `key_not_allowed` ("this api key is restricted to other keys") for any other key ID, including one that does not exist, where an unrestricted API key gets `404 not_found`. | live (`key_not_allowed`), openapi |
+| 403 | `ip_not_allowed`, `key_not_allowed`, `api_token_required` | A restricted API token. An API token restricted to particular keys gets `key_not_allowed` ("this api token is restricted to other keys") for any other key ID, including one that does not exist, where an unrestricted API token gets `404 not_found`. | live (`key_not_allowed`), openapi |
 | 404 | `not_found` | An unknown, destroyed, or inaccessible key ID | live, openapi |
 | 405 | `method_not_allowed` | The wrong method | live |
 | 409 | `key_pending_deletion` | The key is pending deletion. Both operations are refused. | openapi |
 | 413 | `payload_too_large` | A body over 128 KiB, or an `aad` over the tier limit | live, openapi |
 | 415 | `unsupported_media_type` | No `Content-Type: application/json` | live, openapi |
-| 429 | `ops_cap_reached`, `rate_limited` | A `free` key at its monthly cap, or over 100 requests per second for the API key | openapi |
+| 429 | `ops_cap_reached`, `rate_limited` | A `free` key at its monthly cap, or over 100 requests per second for the API token | openapi |
 | 500 | `internal_error` | A server-side failure | openapi |
 | 503 | `unavailable` | A bounded internal queue was full. "Nothing is wrong with the request; retry it." | openapi |
 
@@ -171,7 +171,7 @@ Status codes for `wrap` and `unwrap`:
 
 - A tampered label or `wrapped` DEK in a file header is refused by `unwrap`
   with `400 invalid_ciphertext`, and a tampered key ID with `404 not_found`
-  (or `403 key_not_allowed` for an API key restricted to particular keys).
+  (or `403 key_not_allowed` for an API token restricted to particular keys).
   (The OpenAPI description also lists `400 invalid_base64`, which a `wrapped`
   value that is no longer base64 would presumably get.) A changed
   `wrapped` length that still parses is usually refused the same way. These reach the

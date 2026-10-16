@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write # to sign the attestation with Sigstore
+      attestations: write # to store the attestation with GitHub
     steps:
       # GoReleaser skips signing when MACOS_SIGN_P12 is empty, and a missing
       # secret arrives as an empty string. Fail rather than publish unsigned
@@ -54,12 +56,18 @@ jobs:
         with:
           fetch-depth: 0 # the changelog needs the previous tag
           persist-credentials: false
+      # The newest Go release, so that binaries get its security fixes.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version: stable
+          check-latest: true
           cache: false # build release binaries from a clean module cache
       - run: make vet test race
 
+      # GoReleaser makes each binary's SBOM with Syft.
+      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          syft-version: v1.54.1
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           version: v2.18.3
@@ -72,3 +80,13 @@ jobs:
           MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
           MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      # Sign a SLSA build provenance attestation for every file in
+      # SHA256SUMS, each binary and its SBOM: it records that this workflow
+      # built the file from the tagged commit. "gh attestation verify"
+      # checks it; see the README. The release is already published by now,
+      # so if this step fails, delete the GitHub release (not the tag) and
+      # re-run the workflow.
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: dist/SHA256SUMS

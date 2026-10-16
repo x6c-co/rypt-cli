@@ -1,5 +1,15 @@
 # Releasing rypt
 
+A release is a pull request from `development` into `main` (see
+[CONTRIBUTING.md](../CONTRIBUTING.md)). Once it is merged, tag the merge
+commit on `main`:
+
+```sh
+git switch main && git pull
+git tag -a v1.0.0 -m v1.0.0
+git push origin v1.0.0
+```
+
 Pushing a tag that starts with `v` runs
 [.github/workflows/release.yml](../.github/workflows/release.yml). It runs
 `make vet test race`, builds the six binaries with GoReleaser
@@ -8,11 +18,6 @@ binaries, publishes a GitHub release with the binaries, `SHA256SUMS`, and a
 changelog of the commits since the previous tag, and then updates the
 Homebrew cask in [x6c-co/homebrew-tap](https://github.com/x6c-co/homebrew-tap).
 
-```sh
-git tag -a v1.0.0 -m v1.0.0
-git push origin v1.0.0
-```
-
 A tag with a pre-release suffix, such as `v1.1.0-rc.1`, is published as a
 pre-release and leaves the Homebrew cask alone. `rypt version` prints the tag.
 
@@ -20,8 +25,18 @@ The release binaries are named and checksummed the same way as `make dist`
 output: `rypt-linux-amd64`, `rypt-darwin-arm64`, `rypt-windows-amd64.exe`, and
 so on.
 
+Each binary has a CycloneDX SBOM beside it, named like it
+(`rypt-linux-amd64.cdx.json`), which GoReleaser makes with Syft from the
+binary's own build information: the Go version and every module compiled in.
+The SBOMs are listed in `SHA256SUMS` too, and the workflow's last step signs a
+build provenance attestation for every file in `SHA256SUMS` with
+[actions/attest](https://github.com/actions/attest); the README shows how to
+verify one. The release workflow builds with
+the newest Go release, whatever go.mod's `go` line says, so that binaries
+get the standard library's security fixes.
+
 [.github/workflows/ci.yml](../.github/workflows/ci.yml) runs the same tests on
-every push to `main` and every pull request, and builds all six targets with
+every push to `main` and `development` and every pull request, and builds all six targets with
 the release configuration, unsigned.
 
 To build locally with the release configuration, unsigned, install

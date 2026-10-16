@@ -24,6 +24,17 @@ archives:
   - formats: [binary]
     name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
 
+# A CycloneDX SBOM for each binary, named like it: rypt-linux-amd64.cdx.json
+# and so on. Syft reads the Go version and the modules from the binary's
+# build information, so the SBOM lists exactly what was compiled in.
+sboms:
+  - id: binaries
+    artifacts: binary
+    cmd: syft
+    args: ["$artifact", "--output", "cyclonedx-json=$document", "--quiet"]
+    documents:
+      - "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}.cdx.json"
+
 checksum:
   name_template: SHA256SUMS
   algorithm: sha256

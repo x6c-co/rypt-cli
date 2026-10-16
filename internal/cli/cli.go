@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
-	"github.com/x6c-co/rypt-cli/internal/client"
+	"github.com/x6c-co/rypt"
+
 	"github.com/x6c-co/rypt-cli/internal/format"
 )
 
@@ -116,7 +118,7 @@ func ioError(err error) error {
 // exitCode maps an error to its exit code.
 func exitCode(err error) int {
 	var ee *exitError
-	var ce *client.Error
+	var ce *rypt.Error
 	switch {
 	case err == nil:
 		return ExitOK
@@ -186,8 +188,10 @@ func Run(ctx context.Context, env Env) int {
 // Tests set it to avoid sleeping.
 var clientBackoff func(retry int) time.Duration
 
-// newClient returns an API client configured from the environment.
-func newClient(env Env) (*client.Client, error) {
+// newClient returns an API client configured from the environment. It makes
+// at most three attempts at each call, retrying only what is safe to repeat;
+// wrap and unwrap always are.
+func newClient(env Env) (*rypt.Client, error) {
 	token := env.Getenv("RYPT_TOKEN")
 	if token == "" {
 		return nil, usageErrorf("RYPT_TOKEN is not set")
@@ -197,14 +201,18 @@ func newClient(env Env) (*client.Client, error) {
 			return nil, usageErrorf("RYPT_TOKEN contains a character that is not printable ASCII")
 		}
 	}
-	c, err := client.New(client.Options{
-		BaseURL:   env.Getenv("RYPT_API_URL"),
-		Token:     token,
-		UserAgent: "rypt-cli/" + env.Version,
-		Backoff:   clientBackoff,
-	})
+	opts := []rypt.Option{
+		rypt.WithBaseURL(env.Getenv("RYPT_API_URL")),
+		rypt.WithUserAgent("rypt-cli/" + env.Version),
+		rypt.WithMaxAttempts(3),
+	}
+	if clientBackoff != nil {
+		opts = append(opts, rypt.WithBackoff(clientBackoff))
+	}
+	c, err := rypt.NewClient(token, opts...)
 	if err != nil {
-		return nil, usageErrorf("RYPT_API_URL: %v", err)
+		// The token was checked above, so the base URL is what is wrong.
+		return nil, usageErrorf("RYPT_API_URL: %s", strings.TrimPrefix(err.Error(), "rypt: "))
 	}
 	return c, nil
 }

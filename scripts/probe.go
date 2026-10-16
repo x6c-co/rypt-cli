@@ -28,11 +28,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
-	"github.com/x6c-co/rypt-cli/internal/client"
+	"github.com/x6c-co/rypt"
 )
 
 var (
@@ -57,16 +59,26 @@ type result struct {
 func main() {
 	token = os.Getenv("RYPT_TOKEN")
 	keyID = os.Getenv("RYPT_KEY_ID")
-	baseURL, err := client.ParseBaseURL(os.Getenv("RYPT_API_URL"))
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "probe: RYPT_API_URL:", err)
-		os.Exit(2)
-	}
-	base = baseURL.String()
 	if token == "" || keyID == "" {
 		fmt.Fprintln(os.Stderr, "probe: RYPT_TOKEN and RYPT_KEY_ID must be set")
 		os.Exit(2)
 	}
+	// rypt.NewClient checks the base URL with the rules rypt uses. The
+	// probe sends its own requests, to see the raw responses.
+	base = os.Getenv("RYPT_API_URL")
+	if _, err := rypt.NewClient(token, rypt.WithBaseURL(base)); err != nil {
+		fmt.Fprintln(os.Stderr, "probe: RYPT_API_URL:", strings.TrimPrefix(err.Error(), "rypt: "))
+		os.Exit(2)
+	}
+	if base == "" {
+		base = rypt.DefaultBaseURL
+	}
+	baseURL, _ := url.Parse(base) // valid: NewClient accepted it
+	if baseURL.Scheme == "http" {
+		// net/http bypasses a proxy only for the exact name "localhost".
+		baseURL.Host = strings.ToLower(baseURL.Host)
+	}
+	base = strings.TrimRight(baseURL.String(), "/")
 	fmt.Printf("base URL: %s\n\n", base)
 
 	// Key metadata is not a metered operation.

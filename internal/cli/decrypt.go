@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -71,7 +72,15 @@ func runDecrypt(ctx context.Context, env Env, opts *options) error {
 	if len(h.Label) > 0 {
 		aad = h.Label
 	}
-	dek, err := api.Unwrap(ctx, format.FormatKeyID(h.KeyID), string(h.Wrapped), aad)
+	// A wrapped DEK that is not base64 cannot have come from the API: the
+	// header is damaged, and no operation is spent finding that out.
+	// The decoder skips line breaks, so a field of only line breaks decodes
+	// to nothing.
+	wrapped, err := base64.StdEncoding.AppendDecode(nil, h.Wrapped)
+	if err != nil || len(wrapped) == 0 {
+		return fmt.Errorf("%s: the wrapped data key in the header is not base64: %w", describe(opts.input), format.ErrIntegrity)
+	}
+	dek, err := api.Unwrap(ctx, format.FormatKeyID(h.KeyID), wrapped, aad)
 	if err != nil {
 		return fmt.Errorf("unwrap: %w", err)
 	}

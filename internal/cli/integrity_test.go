@@ -179,6 +179,10 @@ func TestHeaderRejected(t *testing.T) {
 			return ct
 		}},
 		{"wrapped invalid UTF-8", rebuild(func(h *specHeader) { h.Wrapped = append([]byte("CiQA"), 0xc3, 0x28) })},
+		// The API sends wrapped as base64, so anything else is damage.
+		{"wrapped not base64", rebuild(func(h *specHeader) { h.Wrapped = []byte("CiQA!!!!") })},
+		{"wrapped unpadded base64", rebuild(func(h *specHeader) { h.Wrapped = []byte("CiQAWQ") })},
+		{"wrapped newline only", rebuild(func(h *specHeader) { h.Wrapped = []byte("\n") })},
 		{"wrapped length past the end", func(ct []byte, hdr specHeader) []byte {
 			n := hdr.offWrappedLen()
 			binary.BigEndian.PutUint32(ct[n:], 60000)

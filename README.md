@@ -124,8 +124,8 @@ API unwraps it. A header whose key ID, label, wrapped DEK, or wrapped length
 was changed but still parses is usually refused by the API (`not_found`,
 `key_not_allowed`, or `invalid_ciphertext`), which gives exit code 1. A change
 that makes the header invalid, such as a label or wrapped DEK that is no
-longer UTF-8 or a length out of range, gives exit code 4, as does any change
-to the body.
+longer UTF-8, a wrapped DEK that is no longer base64, or a length out of
+range, gives exit code 4, as does any change to the body.
 
 ## Operational notes
 
@@ -166,7 +166,7 @@ All integers are big-endian.
 | label length | 2 bytes | 0 to 1024 |
 | label | variable | UTF-8 |
 | wrapped length | 4 bytes | Length of the next field, 1 to 65536 |
-| wrapped DEK | variable | The API's `wrapped` string, byte for byte |
+| wrapped DEK | variable | The API's `wrapped` value, in the standard padded base64 the API sends |
 
 The body is a sequence of chunks, each the AEAD ciphertext of one plaintext
 chunk followed by its 16-byte tag. Every chunk but the last holds exactly
@@ -187,10 +187,12 @@ go run scripts/probe.go       # record live wrap/unwrap shapes, see docs/api-not
 ```
 
 The unit tests cover the file format, including tamper and header-validation
-cases. The client and command tests run against an in-memory mock of the API
+cases. The command tests run against an in-memory mock of the API
 built with `net/http/httptest`, selected with `RYPT_API_URL`. The integration
 tests build the binary, run full round trips against the live API, and skip
 when `RYPT_TOKEN` or `RYPT_KEY_ID` is unset. They never print the token.
+The API client itself is the [github.com/x6c-co/rypt](https://github.com/x6c-co/rypt)
+module, which has its own tests.
 
 [docs/api-notes.md](docs/api-notes.md) records the observed behaviour of the
 `wrap` and `unwrap` endpoints.

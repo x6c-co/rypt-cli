@@ -76,9 +76,17 @@ Response `200`, when no `dek` was sent:
   not document its internal structure. The length can differ on other tiers
   (`free` and `wrapped` keys use a rypt-held data key under a shared Cloud
   KMS root), so the program treats `wrapped` as an opaque string. (openapi)
-- Program decision: store `wrapped` byte for byte as UTF-8, never decode it,
-  and refuse a `wrap` response whose `wrapped` is empty or longer than 65,536
-  bytes, the header's limit. The observed 188 characters are far below that.
+- Program decision: store `wrapped` in the header as the standard padded
+  base64 the API sends, and refuse a `wrap` response whose `wrapped` is empty
+  or longer than 65,536 bytes, the header's limit. The observed 188
+  characters are far below that. The client library,
+  [github.com/x6c-co/rypt](https://github.com/x6c-co/rypt), hands `wrapped`
+  over as decoded bytes, so the program encodes it again for the header and
+  decodes the header's value before `unwrap`. An encoder writes one
+  standard padded base64 string for each byte string, so the header holds
+  the API's string exactly. A header whose `wrapped` value is not standard padded base64
+  cannot have come from the API, and is refused with exit code 4 before any
+  API call.
 
 ## unwrap
 
@@ -164,7 +172,7 @@ Status codes for `wrap` and `unwrap`:
 
 - No `retry-after` header was observed on any response. (live)
 - Responses from Cloudflare in front of the service (for example a 502 or
-  504) may not carry the JSON envelope. The client falls back to the
+  504) may not carry the JSON envelope. The client library falls back to the
   `x-request-id` header and the HTTP status. (inference; not observed)
 
 ## Consequences for the program
@@ -172,17 +180,17 @@ Status codes for `wrap` and `unwrap`:
 - A tampered label or `wrapped` DEK in a file header is refused by `unwrap`
   with `400 invalid_ciphertext`, and a tampered key ID with `404 not_found`
   (or `403 key_not_allowed` for an API token restricted to particular keys).
-  (The OpenAPI description also lists `400 invalid_base64`, which a `wrapped`
-  value that is no longer base64 would presumably get.) A changed
+  A `wrapped` value that is no longer base64 never reaches the API: the
+  program refuses it locally, exit code 4. A changed
   `wrapped` length that still parses is usually refused the same way. These reach the
   program as API refusals, exit code 1, before any chunk is decrypted. A
   change that makes the header fail local validation (a label or `wrapped`
-  value that is no longer UTF-8, or a length out of range) is exit code 4
+  value that is no longer UTF-8 or base64, or a length out of range) is exit code 4
   with no API call. With the correct DEK, every one of these changes also
   fails chunk authentication, because the whole header is the chunk
   associated data; the format tests check every header bit that way.
-- The client retries a connection error and HTTP 502, 503, and 504, at most
-  twice. It does not retry a TLS certificate or protocol error, which would
+- The client library retries a connection error and HTTP 502, 503, and 504
+  on `wrap` and `unwrap`, at most twice. It does not retry a TLS certificate or protocol error, which would
   fail the same way again, or any other status.
 - Rotating a key so that the version a `wrapped` value names is no longer
   enabled makes `unwrap` return `400 invalid_ciphertext`. (openapi)

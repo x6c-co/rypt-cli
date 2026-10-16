@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"unicode/utf8"
@@ -87,22 +88,24 @@ func runEncrypt(ctx context.Context, env Env, opts *options) (err error) {
 	if opts.label != "" {
 		label = []byte(opts.label)
 	}
-	wrapped, err := api.Wrap(ctx, format.FormatKeyID(keyID), label)
+	dk, err := api.GenerateDataKey(ctx, format.FormatKeyID(keyID), label)
 	if err != nil {
 		return fmt.Errorf("wrap: %w", err)
 	}
-	dek := wrapped.DEK
+	dek := dk.Plaintext
 	defer clear(dek)
 	if len(dek) != format.KeySize {
 		return &exitError{code: ExitAPI, err: fmt.Errorf("wrap: the API returned a %d-byte data key, not %d", len(dek), format.KeySize)}
 	}
 
+	// The header holds the wrapped DEK as the API sends it: standard padded
+	// base64.
 	h := &format.Header{
 		Cipher:    cipher,
 		ChunkSize: format.DefaultChunkSize,
 		KeyID:     keyID,
 		Label:     label,
-		Wrapped:   []byte(wrapped.Wrapped),
+		Wrapped:   base64.StdEncoding.AppendEncode(nil, dk.Wrapped),
 	}
 	if _, err := h.Marshal(); err != nil {
 		// The client bounds the wrapped DEK, so this means the API returned a

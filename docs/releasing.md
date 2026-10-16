@@ -28,7 +28,10 @@ so on.
 Each binary has a CycloneDX SBOM beside it, named like it
 (`rypt-linux-amd64.cdx.json`), which GoReleaser makes with Syft from the
 binary's own build information: the Go version and every module compiled in.
-The SBOMs are listed in `SHA256SUMS` too. The release workflow builds with
+The SBOMs are listed in `SHA256SUMS` too, and the workflow's last step signs a
+build provenance attestation for every file in `SHA256SUMS` with
+[actions/attest](https://github.com/actions/attest); the README shows how to
+verify one. The release workflow builds with
 the newest Go release, whatever go.mod's `go` line says, so that binaries
 get the standard library's security fixes.
 

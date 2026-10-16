@@ -45,6 +45,24 @@ that `go install` records. To check a release or `make dist` output, run
 (`shasum -a 256 -c --ignore-missing SHA256SUMS` on macOS) in the directory
 that holds it.
 
+### Verify a release
+
+From v0.2.0 on, every release file has a signed build provenance
+attestation, which shows that this repository's release workflow built it
+from the tagged commit. A checksum only shows that a file matches
+`SHA256SUMS`, which is published beside it; the attestation shows where both
+came from. With the [GitHub CLI](https://cli.github.com):
+
+```sh
+gh attestation verify rypt-linux-amd64 \
+  --repo x6c-co/rypt-cli \
+  --signer-workflow x6c-co/rypt-cli/.github/workflows/release.yml
+```
+
+The same command checks the `rypt` that Homebrew installed: give it
+`"$(command -v rypt)"` instead of a file name. Each binary's SBOM
+(`rypt-linux-amd64.cdx.json` and so on) is attested the same way.
+
 ## Usage
 
 ```

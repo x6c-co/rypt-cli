@@ -1,6 +1,6 @@
 module github.com/x6c-co/rypt-cli
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/x6c-co/rypt v0.1.0

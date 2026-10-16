@@ -25,6 +25,13 @@ The release binaries are named and checksummed the same way as `make dist`
 output: `rypt-linux-amd64`, `rypt-darwin-arm64`, `rypt-windows-amd64.exe`, and
 so on.
 
+Each binary has a CycloneDX SBOM beside it, named like it
+(`rypt-linux-amd64.cdx.json`), which GoReleaser makes with Syft from the
+binary's own build information: the Go version and every module compiled in.
+The SBOMs are listed in `SHA256SUMS` too. The release workflow builds with
+the newest Go release, whatever go.mod's `go` line says, so that binaries
+get the standard library's security fixes.
+
 [.github/workflows/ci.yml](../.github/workflows/ci.yml) runs the same tests on
 every push to `main` and `development` and every pull request, and builds all six targets with
 the release configuration, unsigned.

@@ -95,7 +95,7 @@ rypt decrypt < photos.tgz.rypt | tar -xzf -
 | --- | --- |
 | `RYPT_TOKEN` | Required. The rypt API token. There is no flag for it, so it never appears in a process list. |
 | `RYPT_KEY_ID` | The default key for `encrypt`. |
-| `RYPT_API_URL` | The API base URL, default `https://api.rypt.dev`. Plain `http` is accepted only for `localhost`, `127.0.0.1`, and `::1`, and is never sent through a proxy. This variable exists for tests. |
+| `RYPT_API_URL` | The API base URL, default `https://api.rypt.dev`. Plain `http` is accepted only for `127.0.0.1` and `[::1]`, written exactly so, and is never sent through a proxy; the name `localhost` needs `https`. This variable exists for tests. |
 
 Input and output:
 

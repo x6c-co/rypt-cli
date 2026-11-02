@@ -4,16 +4,20 @@ package main
 
 import (
 	"bytes"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/x6c-co/rypt-cli/internal/cli"
 )
 
 // TestSecondSignal: a second Ctrl-C during the grace period ends the wait
@@ -114,10 +118,12 @@ func TestHangupIgnored(t *testing.T) {
 	}
 }
 
-// TestPlainHTTPNeverProxied: with HTTP_PROXY set, a plain-http API URL on
-// loopback is reached directly, however "localhost" is capitalized. A proxy
-// would see the token in clear text. (net/http reads the proxy variables
-// once per process, hence a child process per case.)
+// TestPlainHTTPNeverProxied: with HTTP_PROXY set, a plain-http API URL is
+// reached directly. A proxy would see the token in clear text. Plain http
+// is allowed only to the addresses 127.0.0.1 and ::1, never to a name such
+// as localhost, which is looked up and could resolve to another machine, so
+// http://localhost is a usage error and sends nothing. (net/http reads the
+// proxy variables once per process, hence a child process per case.)
 func TestPlainHTTPNeverProxied(t *testing.T) {
 	t.Parallel()
 	var proxied atomic.Int32
@@ -127,21 +133,27 @@ func TestPlainHTTPNeverProxied(t *testing.T) {
 	}))
 	t.Cleanup(proxy.Close)
 
-	for _, host := range []string{"LOCALHOST", "LocalHost", "localhost", "127.0.0.1"} {
-		api := newE2EAPI(t)
-		u, err := url.Parse(api.srv.URL)
-		if err != nil {
-			t.Fatal(err)
-		}
-		u.Host = host + ":" + u.Port()
-		dir := t.TempDir()
-		cmd, _, stderr := command(t, dir, api, "encrypt", "-o", "out.rypt")
-		cmd.Env = append(cmd.Env, "RYPT_API_URL="+u.String(), "HTTP_PROXY="+proxy.URL, "http_proxy="+proxy.URL)
+	// encrypt runs "rypt encrypt -o out.rypt" in a new directory, with
+	// RYPT_API_URL set to apiURL and HTTP_PROXY set to the proxy.
+	encrypt := func(t *testing.T, api *e2eAPI, apiURL string) (code int, dir, stderr string) {
+		t.Helper()
+		dir = t.TempDir()
+		cmd, _, errBuf := command(t, dir, api, "encrypt", "-o", "out.rypt")
+		cmd.Env = append(cmd.Env, "RYPT_API_URL="+apiURL, "HTTP_PROXY="+proxy.URL, "http_proxy="+proxy.URL)
 		cmd.Stdin = bytes.NewReader([]byte("proxied?"))
-		if code := exitCode(t, cmd.Run()); code != 0 {
+		code = exitCode(t, cmd.Run())
+		checkStderr(t, errBuf.String())
+		return code, dir, errBuf.String()
+	}
+	// reached checks that encrypt with the API's own plain-http URL sends
+	// one wrap request to the API and writes out.rypt.
+	reached := func(t *testing.T, api *e2eAPI) {
+		t.Helper()
+		u := api.srv.URL
+		code, dir, stderr := encrypt(t, api, u)
+		if code != 0 {
 			t.Errorf("RYPT_API_URL=%s with HTTP_PROXY set: exit %d\n%s", u, code, stderr)
 		}
-		checkStderr(t, stderr.String())
 		if w, _ := api.counts(); w != 1 {
 			t.Errorf("RYPT_API_URL=%s: the API got %d wrap requests, want 1", u, w)
 		}
@@ -149,6 +161,57 @@ func TestPlainHTTPNeverProxied(t *testing.T) {
 			t.Errorf("RYPT_API_URL=%s: %v", u, err)
 		}
 	}
+
+	// The subtests run one after another, so the proxy check at the end
+	// covers all of them.
+	t.Run("127.0.0.1", func(t *testing.T) {
+		api := newE2EAPI(t)
+		if !strings.HasPrefix(api.srv.URL, "http://127.0.0.1:") {
+			t.Fatalf("unexpected API server URL %s", api.srv.URL)
+		}
+		reached(t, api)
+	})
+	t.Run("[::1]", func(t *testing.T) {
+		ln, err := net.Listen("tcp6", "[::1]:0")
+		if err != nil {
+			t.Skipf("no IPv6 loopback: %v", err)
+		}
+		api := newE2EAPIOn(t, ln)
+		if !strings.HasPrefix(api.srv.URL, "http://[::1]:") {
+			t.Fatalf("unexpected API server URL %s", api.srv.URL)
+		}
+		reached(t, api)
+	})
+	// The port is a live API's, so a request that rypt sent would show in
+	// its counts. Where localhost resolves only to ::1, the request would
+	// fail to connect instead, and the exit code check catches that.
+	t.Run("localhost refused", func(t *testing.T) {
+		api := newE2EAPI(t)
+		u, err := url.Parse(api.srv.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, host := range []string{"localhost", "LOCALHOST"} {
+			apiURL := "http://" + host + ":" + u.Port()
+			code, dir, stderr := encrypt(t, api, apiURL)
+			if code != cli.ExitUsage {
+				t.Errorf("RYPT_API_URL=%s: exit %d, want %d\n%s", apiURL, code, cli.ExitUsage, stderr)
+			}
+			if !strings.Contains(stderr, "RYPT_API_URL") || !strings.Contains(stderr, "https") {
+				t.Errorf("RYPT_API_URL=%s: stderr does not say that the URL needs https:\n%s", apiURL, stderr)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "out.rypt")); err == nil {
+				t.Errorf("RYPT_API_URL=%s: out.rypt was written", apiURL)
+			}
+			if l := leftovers(t, dir); len(l) != 0 {
+				t.Errorf("RYPT_API_URL=%s: temporary files left: %q", apiURL, l)
+			}
+		}
+		if w, _ := api.counts(); w != 0 {
+			t.Errorf("the API got %d wrap requests, want 0", w)
+		}
+	})
+
 	if n := proxied.Load(); n != 0 {
 		t.Errorf("the proxy received %d requests, want 0", n)
 	}

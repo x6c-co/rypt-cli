@@ -12,9 +12,10 @@
 // instead searches for the largest aad that wrap accepts on the key, which
 // takes about twenty requests.
 //
-// RYPT_API_URL is checked with the same rules as rypt's: https, or plain
-// http to localhost only. Redirects are not followed, and text from the
-// server is printed quoted, so control characters show as escapes.
+// RYPT_API_URL is checked by rypt.NewClient: it must use https, or plain
+// http only to 127.0.0.1 or [::1], never to the name localhost. Redirects
+// are not followed, and text from the server is printed quoted, so control
+// characters show as escapes.
 //
 //	go run scripts/probe.go [-limits]
 package main
@@ -74,10 +75,6 @@ func main() {
 		base = rypt.DefaultBaseURL
 	}
 	baseURL, _ := url.Parse(base) // valid: NewClient accepted it
-	if baseURL.Scheme == "http" {
-		// net/http bypasses a proxy only for the exact name "localhost".
-		baseURL.Host = strings.ToLower(baseURL.Host)
-	}
 	base = strings.TrimRight(baseURL.String(), "/")
 	fmt.Printf("base URL: %s\n\n", base)
 

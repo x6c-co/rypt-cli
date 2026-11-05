@@ -328,14 +328,15 @@ func TestKeyIDSources(t *testing.T) {
 	})
 }
 
-// TestAPIURL: RYPT_API_URL with a trailing slash, a path prefix, and each
-// loopback name that may use plain http.
+// TestAPIURL: RYPT_API_URL with and without a trailing slash, with a path
+// prefix, and with each address that may use plain http (127.0.0.1 and
+// ::1). The name localhost is refused; see TestUsageErrors.
 func TestAPIURL(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	h.env["RYPT_API_URL"] = h.api.URL() + "/"
 	ct := h.encryptFixture("a.rypt", []byte("x"))
-	h.env["RYPT_API_URL"] = strings.Replace(h.api.URL(), "127.0.0.1", "localhost", 1)
+	h.env["RYPT_API_URL"] = h.api.URL()
 	expect(t, h.runIn(ct, "decrypt"), ExitOK)
 	h.wantCalls(1, 1)
 

@@ -103,6 +103,7 @@ func TestUsageErrors(t *testing.T) {
 		{"api url http remote", map[string]string{"RYPT_API_URL": "http://api.rypt.dev"}, []string{"encrypt", "IN"}},
 		{"api url http private ip", map[string]string{"RYPT_API_URL": "http://10.0.0.1:8080"}, []string{"encrypt", "IN"}},
 		{"api url http 127.0.0.2", map[string]string{"RYPT_API_URL": "http://127.0.0.2:8080"}, []string{"encrypt", "IN"}},
+		{"api url http localhost", map[string]string{"RYPT_API_URL": "http://localhost:1"}, []string{"encrypt", "IN"}},
 		{"api url http localhost lookalike", map[string]string{"RYPT_API_URL": "http://localhost.example.com"}, []string{"encrypt", "IN"}},
 		{"api url http decrypt", map[string]string{"RYPT_API_URL": "http://example.com"}, []string{"decrypt", "CT"}},
 		{"api url user info", map[string]string{"RYPT_API_URL": "https://user:hunter2pw@127.0.0.1:1"}, []string{"encrypt", "IN"}},

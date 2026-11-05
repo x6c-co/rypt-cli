@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -98,6 +99,17 @@ type e2eAPI struct {
 func newE2EAPI(t *testing.T) *e2eAPI {
 	a := &e2eAPI{deks: map[string][]byte{}, entered: make(chan string, 16)}
 	a.srv = httptest.NewServer(http.HandlerFunc(a.serve))
+	t.Cleanup(a.srv.Close)
+	return a
+}
+
+// newE2EAPIOn is newE2EAPI with the server on ln instead of 127.0.0.1.
+func newE2EAPIOn(t *testing.T, ln net.Listener) *e2eAPI {
+	a := &e2eAPI{deks: map[string][]byte{}, entered: make(chan string, 16)}
+	a.srv = httptest.NewUnstartedServer(http.HandlerFunc(a.serve))
+	a.srv.Listener.Close()
+	a.srv.Listener = ln
+	a.srv.Start()
 	t.Cleanup(a.srv.Close)
 	return a
 }
